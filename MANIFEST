@@ -2,6 +2,7 @@ CHANGES
 COPYING
 ECB.pm
 MANIFEST
+META.yml
 Makefile.PL
 README
 test.pl
@@ -13,4 +14,3 @@ t/50-caching.t
 t/60-nullblock-1.t
 t/65-nullblock-2.t
 
-META.yml                                 Module meta-data (added by MakeMaker)
