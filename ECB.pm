@@ -564,23 +564,16 @@ or the cipher without having to create a new crypt object.
 
 =head1 METHODS
 
-=head2 Public methods
-
-  new(), key(), cipher()
-
-  start(), mode()
-  crypt()
-  finish()
-
-  padding(),
-  caching(),
-
-  encrypt(), encrypt_hex()
-  decrypt(), decrypt_hex()
-
-=head2 new()
+=head2 new(), key(), cipher(), padding()
 
   $crypt = Crypt::ECB->new;
+  $crypt->key("Some_key");
+  $crypt->cipher("Blowfish") || die $crypt->errstring;
+  $crypt->padding(PADDING_AUTO);
+
+  print $crypt->key;
+  print $crypt->cipher;
+  print $crypt->padding;
 
   $crypt = Crypt::ECB->new("Some_key","Blowfish");
   $crypt->cipher || die "'Blowfish' wasn't loaded for some reason.";
@@ -590,35 +583,36 @@ key and cipher.  If called without parameters you have to call B<key()>
 and B<cipher()> before you can start crypting.  If called with key but
 without cipher, for compatibility with Crypt::CBC 'DES' is assumed.
 
-=head2 key()
-
-  $crypt->key("some_key");
-
-  print $crypt->key;
-
-This method sets the key if given a parameter.  It always returns the
+B<key()> sets the key if given a parameter.  It always returns the
 key.  Note that some crypting modules require keys of definite length.
 For example the Crypt::Blowfish module expects an eight byte key.
 
-=head2 cipher()
-
-  $crypt->cipher("Blowfish") || die $crypt->errstring;
-
-  print $crypt->cipher;
-
-This method sets the block cipher to be used if given a parameter.
+B<cipher()> sets the block cipher to be used if given a parameter.
 It tries to load the corresponding module.  If an error occurs, it
 returns 0 and sets $crypt->{Errstring}.  Otherwise it returns the
 cipher name.  Free packages available for Perl are for example
-Blowfish, DES or IDEA.
+Blowfish, DES or IDEA. If called without parameter it just returns
+the name of the cipher.
 
-If called without parameter it just returns the name of the cipher.
+B<padding()> sets the way how data is padded up to a multiple of the
+cipher's blocksize.  Until now two ways are implemented: When set to
+PADDING_NONE, no padding is done.  You then have to take
+care of correct padding (and truncating) yourself. When set to
+PADDING_AUTO, the ECB module handles padding (and truncating
+when decrypting) the same way Crypt::CBC does.
 
-=head2 start(), mode()
+By default the padding style is set to PADDING_NONE.  This means if you
+don't bother and your data has not the correct length, the module will
+complain and therefore force you to think about what you really want.
+
+=head2 start(), mode(), crypt(), finish()
 
   $crypt->start('encrypt') || die $crypt->errstring;
-  $crypt->start('decrypt');
+  $enc  = $crypt->crypt($data1)
+       . $crypt->crypt($data2)
+       . $crypt->finish;
 
+  $crypt->start('decrypt');
   print $crypt->mode;
 
 B<start()> sets the crypting mode and checks if all required variables
@@ -629,12 +623,6 @@ set or 0 if an error occurred.
 B<mode()> is called without parameters and just returns the mode which
 is set.
 
-=head2 crypt(), finish()
-
-  $enc  = $crypt->crypt($data1);
-  $enc .= $crypt->crypt($data2);
-  $enc .= $crypt->finish;
-
 B<crypt()> processes the data given as argument.  If called without
 argument $_ is processed.  The method returns the processed data.
 Cipher and key have to be set in order to be able to process data.
@@ -643,26 +631,6 @@ the method dies.
 
 After having sent all data to be processed to B<crypt()> you have to
 call B<finish()> in order to flush data that's left in the buffer.
-
-=head2 padding()
-
-  $crypt->padding(PADDING_NONE);
-  $crypt->padding(PADDING_AUTO);
-
-  print $crypt->padding;
-
-This methods sets the way how data is padded up to a multiple of the
-cipher's blocksize.  Until now two ways are implemented:
-
-When set to PADDING_NONE, no padding is done.  You then have to take
-care of correct padding (and truncating) yourself.
-
-When set to PADDING_AUTO, the ECB module handles padding (and truncating
-when decrypting) the same way Crypt::CBC does.
-
-By default the padding style is set to PADDING_NONE.  This means if you
-don't bother and your data has not the correct length, the module will
-complain and therefore force you to think about what you really want.
 
 =head2 caching()
 
@@ -684,21 +652,20 @@ object is created is created each time B<crypt()> or B<finish()> are
 called and destroyed at the end of these methods.  Crypting using
 caching is B<much> faster than without caching.
 
-=head2 encrypt(), decrypt()
+=head2 encrypt(), decrypt(), encrypt_hex(), decrypt_hex()
 
   $enc = $crypt->encrypt($data);
   print $crypt->decrypt($enc);
 
-These are convenience methods which call B<start()>, B<crypt()> and
-B<finish()> for you.
-
-=head2 encrypt_hex(), decrypt_hex()
-
   $hexenc = $crypt->encrypt_hex($data);
   print $crypt->decrypt_hex($hexenc);
 
-These are convenience functions that operate on ciphertext in a
-hexadecimal representation.  They are exactly equivalent to
+B<encrypt()> and B<decrypt()> are convenience methods which call
+B<start()>, B<crypt()> and B<finish()> for you.
+
+B<encrypt_hex()> and B<decrypt_hex()> are convenience functions
+that operate on ciphertext in a hexadecimal representation.  They are
+exactly equivalent to
 
   $hexenc = join('',unpack('H*',$crypt->encrypt($data)));
   print $crypt->decrypt(pack('H*',$hexenc));
@@ -746,23 +713,22 @@ functions.  The functions are: B<encrypt()>, B<decrypt()>,
 B<encrypt_hex>, B<decrypt_hex>.  The module is smart enough to
 recognize whether these functions are called in an OO context or not.
 
-=head2 encrypt(), decrypt()
+=head2 encrypt(), decrypt(), encrypt_hex(), decrypt_hex()
 
   $ciphertext = encrypt($key, $cipher, $plaintext, PADDING_AUTO);
   $plaintext  = decrypt($key, $cipher, $ciphertext, PADDING_AUTO);
 
-These functions process the provided text and return either the
+  $ciphertext = encrypt_hex($key, $cipher, $plaintext, PADDING_AUTO);
+  $plaintext  = decrypt_hex($key, $cipher, $ciphertext, PADDING_AUTO);
+
+B<encrypt()> and B<decrypt()> process the provided text and return either the
 corresponding ciphertext (encrypt) or plaintext (decrypt).  Data
 and padstyle are optional, but remember that by default no padding
 is done.  If data is omitted, $_ is assumed.
 
-=head2 encrypt_hex(), decrypt_hex()
-
-  $ciphertext = encrypt_hex($key, $cipher, $plaintext, PADDING_AUTO);
-  $plaintext  = decrypt_hex($key, $cipher, $ciphertext, PADDING_AUTO);
-
-These functions operate on ciphertext in a hexadecimal representation.
-Otherwise usage is the same as for B<encrypt()> and B<decrypt()>.
+B<encrypt_hex()> and B<decrypt_hex()> operate on ciphertext in a
+hexadecimal representation. Otherwise usage is the same as for
+B<encrypt()> and B<decrypt()>.
 
 =head1 BUGS
 
