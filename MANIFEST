@@ -1,0 +1,11 @@
+COPYING
+ECB.pm
+MANIFEST
+Makefile.PL
+README
+test.pl
+t/caching.t
+t/decoding.t
+t/encoding.t
+t/padding.t
+t/substr.t
