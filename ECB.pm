@@ -16,14 +16,14 @@ require Exporter;
 @ISA       = qw(Exporter);
 @EXPORT    = qw(PADDING_NONE PADDING_AUTO);
 @EXPORT_OK = qw(encrypt decrypt encrypt_hex decrypt_hex);
-$VERSION   = 1.30;
+$VERSION   = '1.40';
 
 use constant PADDING_NONE => 0;
 use constant PADDING_AUTO => 1;
 
 
 ########################################
-# basic methods
+# public methods
 ########################################
 
 #
@@ -66,8 +66,7 @@ sub new ($;$$$)
 }
 
 #
-# sets key if argument given
-# returns key
+# sets key if argument given, returns key
 #
 sub key (\$;$)
 {
@@ -203,15 +202,6 @@ sub start (\$$)
 }
 
 #
-# returns mode
-#
-sub mode (\$)
-{
-    my $crypt = shift;
-    return $crypt->{Mode};
-}
-
-#
 # calls the crypting module
 # returns the en-/decrypted data
 #
@@ -220,7 +210,7 @@ sub crypt (\$;$)
     my $crypt = shift;
     my $data  = shift;
     
-    $data ||= $_ || '' unless length($data);
+    $data = ($_ || '') unless length($data);
 
     my $errmsg = $crypt->{Errstring};
     my $bs     = $crypt->{Blocksize};
@@ -241,13 +231,11 @@ sub crypt (\$;$)
     # by the cipher module
     my @blocks = $data=~/(.{1,$bs})/gs;
 
+    # last block goes into buffer
     $crypt->{buffer} = pop @blocks;
 
-    my $cipher = $crypt->_getcipher;
-    my $text = '';
-    foreach my $block (@blocks) {
-	$text .= $cipher->$mode($block);
-    }
+    my ($cipher, $text) = ($crypt->_getcipher, '');
+    $text .= $cipher->$mode($_) foreach (@blocks);
     return $text;
 }
 
@@ -273,6 +261,7 @@ sub finish (\$)
 	  . " \$mode being one of 'decrypt' or 'encrypt'.\n";
     }
 
+    # cleanup: forget mode, purge buffer
     $crypt->{Mode}   = '';
     $crypt->{buffer} = '';
 
@@ -314,6 +303,29 @@ sub finish (\$)
 }
 
 #
+# returns mode
+#
+sub mode (\$)
+{
+    my $crypt = shift;
+    return $crypt->{Mode};
+}
+
+#
+# returns errstring
+#
+sub errstring (\$)
+{
+    my $crypt = shift;
+    return $crypt->{Errstring};
+}
+
+
+########################################
+# private methods
+########################################
+
+#
 # truncates result to correct length
 #
 sub _truncate (\$$)
@@ -327,11 +339,14 @@ sub _truncate (\$$)
     {
 	# no action
     }
+
     # PADDING_AUTO means padding as in Crypt::CBC
     elsif ($padstyle == PADDING_AUTO)
     {
 	substr($result,-unpack("C",substr($result,-1))) = '';	
     }
+
+    # some more for the future?
     else
     {
 	die "Padding style '$padstyle' not defined.\n";
@@ -361,10 +376,14 @@ sub _pad (\$$)
 	      . " padding.\n";
 	}
     }
+
+    # PADDING_AUTO means padding (resp. truncating) as in Crypt::CBC
     elsif ($padstyle == PADDING_AUTO)
     {
 	$data .= pack("C*",($bs-length($data))x($bs-length($data)));
     }
+
+    # some more for the future?
     else
     {
 	die "Padding style '$padstyle' not defined.\n";
@@ -382,7 +401,7 @@ sub _getcipher (\$)
 
     if ($crypt->{Caching})
     {
-	# create a new cipher object is necessary
+	# create a new cipher object if necessary
 	unless ($crypt->{cipherobj} &&
 		$crypt->{oldKey}    eq $crypt->{Key} &&
 		$crypt->{oldCipher} eq $crypt->{Cipher})
@@ -400,85 +419,44 @@ sub _getcipher (\$)
     }
 }
 
-#
-# returns errstring
-#
-sub errstring (\$)
-{
-    my $crypt = shift;
-    return $crypt->{Errstring};
-}
-
 
 ########################################
 # convenience functions/methods
 ########################################
 
 #
-# magic convenience encrypt function/method
+# magic decrypt/encrypt function/method
 #
-sub encrypt ($$;$$)
+sub _xcrypt
 {
-    if (ref($_[0]) =~ /^Crypt/)
+    my ($mode, $crypt, $key, $cipher, $data, $padstyle);
+
+    if (ref($_[1]) =~ /^Crypt/)
     {
-	my $crypt = shift;
-
-	$crypt->start('encrypt') || die $crypt->errstring;
-
-	my $text = $crypt->crypt(shift)
-	         . $crypt->finish;
-
-	return $text;
+	($mode, $crypt, $data) = @_;
     }
     else
     {
-	my ($key, $cipher, $data, $padstyle) = @_;
+	($mode, $key, $cipher, $data, $padstyle) = @_;
 
-	my $crypt = Crypt::ECB->new($key);
-
+	$crypt = Crypt::ECB->new($key);
 	$crypt->padding($padstyle || 0);
-	$crypt->cipher($cipher)  || die $crypt->errstring;
-	$crypt->start('encrypt') || die $crypt->errstring;
+	$crypt->cipher($cipher) || die $crypt->errstring;
 
-	my $text = $crypt->crypt($data || $_)
-	         . $crypt->finish;
-
-	return $text;
+	$data = $_ unless length($data);
     }
+
+    $crypt->start($mode) || die $crypt->errstring;
+    my $text = $crypt->crypt($data) . $crypt->finish;
+
+    return $text;
 }
 
 #
-# magic convenience decrypt function/method
+# convenience encrypt and decrypt functions/methods
 #
-sub decrypt ($$;$$)
-{
-    if (ref($_[0]) =~ /^Crypt/)
-    {
-	my $crypt = shift;
-
-	$crypt->start('decrypt') || die $crypt->errstring;
-
-	my $text = $crypt->crypt(shift)
-	         . $crypt->finish;
-
-	return $text;
-    }
-    else
-    {
-	my ($key, $cipher, $data, $padstyle) = @_;
-
-	my $crypt = Crypt::ECB->new($key);
-
-	$crypt->padding($padstyle || 0);
-	$crypt->cipher($cipher)  || die $crypt->errstring;
-	$crypt->start('decrypt') || die $crypt->errstring;
-
-	my $text = $crypt->crypt($data || $_)
-	         . $crypt->finish;
-
-	return $text;
-    }
-}
+sub encrypt ($$;$$) { _xcrypt('encrypt', @_) }
+sub decrypt ($$;$$) { _xcrypt('decrypt', @_) }
 
 #
 # calls encrypt, returns hex packed data
@@ -533,8 +511,8 @@ Use Crypt::ECB OO style
 
   $crypt = Crypt::ECB->new;
   $crypt->padding(PADDING_AUTO);
-  $crypt->cipher("Blowfish") || die $crypt->errstring;
-  $crypt->key("some_key"); 
+  $crypt->cipher('Blowfish') || die $crypt->errstring;
+  $crypt->key('some_key'); 
 
   $enc = $crypt->encrypt("Some data.");
   print $crypt->decrypt($enc);
@@ -543,23 +521,23 @@ or use the function style interface
 
   use Crypt::ECB qw(encrypt decrypt encrypt_hex decrypt_hex);
 
-  $ciphertext = encrypt($key2, "Blowfish", "Some data", PADDING_AUTO);
-  $plaintext  = decrypt($key2, "Blowfish", $ciphertext, PADDING_AUTO);
+  $ciphertext = encrypt($key, 'Blowfish', "Some data", PADDING_AUTO);
+  $plaintext  = decrypt($key, 'Blowfish', $ciphertext, PADDING_AUTO);
 
-  $hexcode = encrypt_hex("foo_key", "IDEA", $plaintext);
-  $plain   = decrypt_hex("foo_key", "IDEA", "A01B45BC");
+  $hexcode = encrypt_hex($key, $cipher, $plaintext);
+  $plain   = decrypt_hex($key, $cipher, $hexcode);
 
 =head1 DESCRIPTION
 
-This module is a Perl-only implementation of the ECB mode.  In
+This module is a Perl-only implementation of the ECB mode. In
 combination with a block cipher such as DES, IDEA or Blowfish, you can
-encrypt and decrypt messages of arbitrarily long length.  Though for
+encrypt and decrypt messages of arbitrarily long length. Though for
 security reasons other modes than ECB such as CBC should be preferred.
 See textbooks on cryptography if you want to know why.
 
 The functionality of the module can be accessed via OO methods or via
-standard function calls.  Remember that some crypting module like for
-example Blowfish has to be installed.  The syntax follows that of
+standard function calls. Remember that some crypting module like for
+example Blowfish has to be installed. The syntax follows that of
 Crypt::CBC.
 
 =head1 METHODS
@@ -567,64 +545,63 @@ Crypt::CBC.
 =head2 new(), key(), cipher(), padding()
 
   $crypt = Crypt::ECB->new;
-  $crypt->key("Some_key");
-  $crypt->cipher("Blowfish") || die $crypt->errstring;
+  $crypt->key('Some_key');
+  $crypt->cipher('Blowfish') || die $crypt->errstring;
   $crypt->padding(PADDING_AUTO);
 
   print $crypt->key;
   print $crypt->cipher;
   print $crypt->padding;
 
-  $crypt = Crypt::ECB->new("Some_key","Blowfish");
+  $crypt = Crypt::ECB->new('Some_key','Blowfish');
   $crypt->cipher || die "'Blowfish' wasn't loaded for some reason.";
 
-B<new()> initializes the variables it uses.  Optional parameters are
-key and cipher.  If called without parameters you have to call B<key()>
-and B<cipher()> before you can start crypting.  If called with key but
+B<new()> initializes the variables it uses. Optional parameters are
+key and cipher. If called without parameters you have to call B<key()>
+and B<cipher()> before you can start crypting. If called with key but
 without cipher, for compatibility with Crypt::CBC 'DES' is assumed.
 
-B<key()> sets the key if given a parameter.  It always returns the
-key.  Note that some crypting modules require keys of definite length.
+B<key()> sets the key if given a parameter. It always returns the
+key. Note that some crypting modules require keys of definite length.
 For example the Crypt::Blowfish module expects an eight byte key.
 
 B<cipher()> sets the block cipher to be used if given a parameter.
-It tries to load the corresponding module.  If an error occurs, it
-returns 0 and sets $crypt->{Errstring}.  Otherwise it returns the
+It tries to load the corresponding module. If an error occurs, it
+returns 0 and sets $crypt->{Errstring}. Otherwise it returns the
 cipher name.  Free packages available for Perl are for example
 Blowfish, DES or IDEA. If called without parameter it just returns
 the name of the cipher.
 
 B<padding()> sets the way how data is padded up to a multiple of the
-cipher's blocksize.  Until now two ways are implemented: When set to
-PADDING_NONE, no padding is done.  You then have to take
+cipher's blocksize. Until now two ways are implemented: When set to
+PADDING_NONE, no padding is done. You then have to take
 care of correct padding (and truncating) yourself. When set to
 PADDING_AUTO, the ECB module handles padding (and truncating
 when decrypting) the same way Crypt::CBC does.
 
-By default the padding style is set to PADDING_NONE.  This means if you
+By default the padding style is set to PADDING_NONE. This means if you
 don't bother and your data has not the correct length, the module will
 complain and therefore force you to think about what you really want.
 
 =head2 start(), mode(), crypt(), finish()
 
   $crypt->start('encrypt') || die $crypt->errstring;
-  $enc  = $crypt->crypt($data1)
-       . $crypt->crypt($data2)
-       . $crypt->finish;
+  $enc .= $crypt->crypt($_) foreach (@lines);
+  $enc .= $crypt->finish;
 
   $crypt->start('decrypt');
   print $crypt->mode;
 
 B<start()> sets the crypting mode and checks if all required variables
-like key and cipher are set.  Allowed parameters are any words
-starting either with 'e' or 'd'.  The Method returns the mode which is
+like key and cipher are set. Allowed parameters are any words
+starting either with 'e' or 'd'. The Method returns the mode which is
 set or 0 if an error occurred.
 
 B<mode()> is called without parameters and just returns the mode which
 is set.
 
-B<crypt()> processes the data given as argument.  If called without
-argument $_ is processed.  The method returns the processed data.
+B<crypt()> processes the data given as argument. If called without
+argument $_ is processed. The method returns the processed data.
 Cipher and key have to be set in order to be able to process data.
 If some of these are missing or B<start()> was not called before,
 the method dies.
@@ -639,17 +616,17 @@ call B<finish()> in order to flush data that's left in the buffer.
 
   print $crypt->caching;
 
-The caching mode is returned.  If given an argument caching mode is set.
+The caching mode is returned. If given an argument caching mode is set.
 Caching is on if B<caching()> evaluates true, otherwise caching is off.
 By default caching is on.
 
-What is this caching?  The Crypt::ECB module communicates with the
-cipher module via some object.  Creating the cipher object takes some time
-for the cipher module has to do some initialization.  Now caching means
+What is this caching? The Crypt::ECB module communicates with the
+cipher module via some object. Creating the cipher object takes some time
+for the cipher module has to do some initialization. Now caching means
 that the same cipher object is used until caching is turned off or the
-key or the cipher module are changed.  If caching is off, a new cipher
+key or the cipher module are changed. If caching is off, a new cipher
 object is created is created each time B<crypt()> or B<finish()> are
-called and destroyed at the end of these methods.  Crypting using
+called and destroyed at the end of these methods. Crypting using
 caching is B<much> faster than without caching.
 
 =head2 encrypt(), decrypt(), encrypt_hex(), decrypt_hex()
@@ -664,7 +641,7 @@ B<encrypt()> and B<decrypt()> are convenience methods which call
 B<start()>, B<crypt()> and B<finish()> for you.
 
 B<encrypt_hex()> and B<decrypt_hex()> are convenience functions
-that operate on ciphertext in a hexadecimal representation.  They are
+that operate on ciphertext in a hexadecimal representation. They are
 exactly equivalent to
 
   $hexenc = join('',unpack('H*',$crypt->encrypt($data)));
@@ -678,7 +655,7 @@ the encrypted information into an e-mail message, Web page or URL.
   print $crypt->errstring;
 
 Some methods like B<cipher()> or B<start()> return 0 if an error
-occurs.  You can then retrieve a more detailed error message by
+occurs. You can then retrieve a more detailed error message by
 calling $crypt->errstring.
 
 =head1 VARIABLES
@@ -696,8 +673,7 @@ Variables which could be of interest to the outside world are:
   $crypt->{Errstring}.
 
 The variables should not be set directly, use instead the above
-described methods.  Reading should not pose a problem, but is also
-provided by the above methods.
+described methods. Reading should not pose a problem.
 
 =head1 CONSTANTS
 
@@ -709,8 +685,8 @@ The two constants naming the padding styles are exported by default:
 =head1 FUNCTIONS
 
 For convenience en- or decrypting can also be done by calling ordinary
-functions.  The functions are: B<encrypt()>, B<decrypt()>,
-B<encrypt_hex>, B<decrypt_hex>.  The module is smart enough to
+functions. The functions are: B<encrypt()>, B<decrypt()>,
+B<encrypt_hex>, B<decrypt_hex>. The module is smart enough to
 recognize whether these functions are called in an OO context or not.
 
 =head2 encrypt(), decrypt(), encrypt_hex(), decrypt_hex()
@@ -721,10 +697,10 @@ recognize whether these functions are called in an OO context or not.
   $ciphertext = encrypt_hex($key, $cipher, $plaintext, PADDING_AUTO);
   $plaintext  = decrypt_hex($key, $cipher, $ciphertext, PADDING_AUTO);
 
-B<encrypt()> and B<decrypt()> process the provided text and return either the
-corresponding ciphertext (encrypt) or plaintext (decrypt).  Data
+B<encrypt()> and B<decrypt()> process the provided text and return either
+the corresponding ciphertext (encrypt) or plaintext (decrypt). Data
 and padstyle are optional, but remember that by default no padding
-is done.  If data is omitted, $_ is assumed.
+is done. If data is omitted, $_ is assumed.
 
 B<encrypt_hex()> and B<decrypt_hex()> operate on ciphertext in a
 hexadecimal representation. Otherwise usage is the same as for
@@ -750,7 +726,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License

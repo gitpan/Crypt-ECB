@@ -1,3 +1,8 @@
+v1.40, January 2005
+	- the '0' block problem still had survived in functions encrypt and decrypt... fixed
+	- some code cleanup
+	- changed versioning scheme to be more CPAN-like
+
 v1.3, January 2005
 	- no code changes, just some minor documentation update
 
@@ -6,4 +11,3 @@ v1.2, January 2005
 
 v1.1, December 2000
 	- first release
-
