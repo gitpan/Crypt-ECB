@@ -6,12 +6,12 @@ use Crypt::ECB;
 
 my ($crypt, $cipher, $ks, $len, $nok, $enc, $dec, $test);
 
-my $text = "This is just some dummy text!\n";
+my $text = "0";
 my $key  = "This is an at least 56 Byte long test key!!! It really is.";
 
 my @ciphers = (
 	       'Blowfish',
-	       'Blowfish_PP',
+               'Blowfish_PP',
 	       'DES',
 	       'DES_PP',
 	       'IDEA',
@@ -19,8 +19,6 @@ my @ciphers = (
 	      );
 
 $crypt = Crypt::ECB->new;
-
-$crypt->padding(PADDING_AUTO);
 
 foreach $cipher (@ciphers) {
     unless ($crypt->cipher($cipher)) {
@@ -32,19 +30,11 @@ foreach $cipher (@ciphers) {
     $crypt->key(substr($key,0,$ks));
 
     $nok = 0;
-    foreach (1..3)
-    {
-	$crypt->caching( 1-($crypt->caching) ); # toggle caching
 
-	$enc = $crypt->encrypt($text);
+    $crypt->padding(PADDING_AUTO);
+    $enc = $crypt->encrypt($text);
+    $nok++ unless $crypt->decrypt($enc) eq $text;
 
-        # if caching off, ciperopj must be empty, and vice versa
-        $nok++ if $crypt->caching ^ ($crypt->{cipherobj} ne '');
-
-	$dec = $crypt->decrypt($enc);
-
-	$nok++ unless $text eq $dec;
-    }
     print "not " if $nok;
     print "ok ".(++$test)."\n";
 }

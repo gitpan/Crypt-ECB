@@ -1,11 +1,16 @@
+CHANGES
 COPYING
 ECB.pm
 MANIFEST
 Makefile.PL
 README
 test.pl
-t/caching.t
-t/decoding.t
-t/encoding.t
-t/padding.t
-t/substr.t
+t/10-encoding.t
+t/20-decoding.t
+t/30-padding.t
+t/40-substr.t
+t/50-caching.t
+t/60-nullblock-1.t
+t/65-nullblock-2.t
+
+META.yml                                 Module meta-data (added by MakeMaker)
