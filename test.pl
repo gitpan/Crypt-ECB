@@ -2,7 +2,7 @@
 
 use Crypt::ECB;
 
-my ($path, $ok, @modules);
+my ($path, $retval, $ok);
 
 my $crypt = Crypt::ECB->new;
 
@@ -12,7 +12,9 @@ foreach $path (@INC) {
     while (<$path/Crypt/*.pm>) {
 	s|^.*Crypt/||;
 	s|\.pm$||;
-	print " Found $_.\n" if $crypt->cipher($_) and ++$ok;
+	$retval = 0;
+	eval { $retval = $crypt->cipher($_) };
+	print " Found $_.\n" if $retval and ++$ok;
     }
 }
 

@@ -1,40 +1,50 @@
 #!/usr/bin/perl -w
 
-BEGIN { print "1..6\n" }
-
 use Crypt::ECB;
+
+my @ciphers =
+(
+	'Blowfish',
+	'Blowfish_PP',
+	'Camellia',
+	'Camellia_PP',
+	'CAST5',
+	'CAST5_PP',
+	'DES',
+	'DES_PP',
+	'IDEA',
+	'Rijndael',
+	'Rijndael_PP',
+	'Twofish2',
+);
+
+print "1..", $#ciphers+1, "\n";
 
 my ($crypt, $cipher, $ks, $len, $nok, $enc, $dec, $test);
 
 my $text = "123456780";
 my $key  = "This is an at least 56 Byte long test key!!! It really is.";
 
-my @ciphers = (
-	       'Blowfish',
-               'Blowfish_PP',
-	       'DES',
-	       'DES_PP',
-	       'IDEA',
-	       'Twofish2',
-	      );
-
 $crypt = Crypt::ECB->new;
 
-foreach $cipher (@ciphers) {
-    unless ($crypt->cipher($cipher)) {
-	print "ok ".(++$test)." # skip, $cipher not installed\n";
-        next;
-    }
+$crypt->padding(PADDING_AUTO);
 
-    $ks = ($crypt->{Keysize} or 8);
-    $crypt->key(substr($key,0,$ks));
+foreach $cipher (@ciphers)
+{
+	unless ($crypt->cipher($cipher))
+	{
+		print "ok ".(++$test)." # skip, $cipher not installed\n";
+		next;
+	}
 
-    $nok = 0;
+	$ks = ($crypt->{Keysize} or 8);
+	$crypt->key(substr($key,0,$ks));
 
-    $crypt->padding(PADDING_AUTO);
-    $enc = $crypt->encrypt($text);
-    $nok++ unless $crypt->decrypt($enc) eq $text;
+	$nok = 0;
 
-    print "not " if $nok;
-    print "ok ".(++$test)."\n";
+	$enc = $crypt->encrypt($text);
+	$nok++ unless $crypt->decrypt($enc) eq $text;
+
+	print "not " if $nok;
+	print "ok ".(++$test)."\n";
 }

@@ -1,11 +1,10 @@
 CHANGES
 COPYING
 ECB.pm
+Makefile.PL
 MANIFEST
 META.yml
-Makefile.PL
 README
-test.pl
 t/10-encryption.t
 t/20-decryption.t
 t/30-padding.t
@@ -14,4 +13,5 @@ t/50-caching.t
 t/60-nullblock-1.t
 t/65-nullblock-2.t
 t/70-funcstyle.t
-
+t/75-funcstyle-nullblock.t
+test.pl

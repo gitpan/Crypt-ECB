@@ -1,6 +1,6 @@
 package Crypt::ECB;
 
-# Copyright (C) 2000, 2005  Christoph Appel (Christoph.Appel@t-systems.com)
+# Copyright (C) 2000, 2005, 2008 Christoph Appel (Christoph.Appel@t-systems.com)
 #  see documentation for details
 
 
@@ -16,7 +16,7 @@ require Exporter;
 @ISA       = qw(Exporter);
 @EXPORT    = qw(PADDING_NONE PADDING_AUTO);
 @EXPORT_OK = qw(encrypt decrypt encrypt_hex decrypt_hex);
-$VERSION   = '1.40';
+$VERSION   = '1.45';
 
 use constant PADDING_NONE => 0;
 use constant PADDING_AUTO => 1;

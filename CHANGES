@@ -1,3 +1,8 @@
+v1.45, July 2008
+	- fixed test.pl so it will not stumble over an already installed Crypt::CBC
+	- fixed bug in t/70-funcstyle.t which could in some cases let tests wrongly fail
+	- test scripts: changed indentation, updated list of known ciphers
+
 v1.40, January 2005
 	- the '0' block problem still had survived in functions encrypt and decrypt... fixed
 	- some code cleanup

@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-use Crypt::ECB;
+use Crypt::ECB qw(encrypt decrypt PADDING_AUTO);
 
 my @ciphers =
 (
@@ -20,10 +20,10 @@ my @ciphers =
 
 print "1..", $#ciphers+1, "\n";
 
-my ($crypt, $cipher, $ks, $len, $nok, $enc, $dec, $test);
+my ($crypt, $cipher, $key, $ks, $len, $nok, $enc1, $enc2, $dec1, $dec2, $test);
 
 my $text = "0";
-my $key  = "This is an at least 56 Byte long test key!!! It really is.";
+my $xkey = "This is an at least 56 Byte long test key!!! It really is.";
 
 $crypt = Crypt::ECB->new;
 
@@ -38,12 +38,19 @@ foreach $cipher (@ciphers)
 	}
 
 	$ks = ($crypt->{Keysize} or 8);
-	$crypt->key(substr($key,0,$ks));
+	$key = substr($xkey, 0, $ks);
+	$crypt->key($key);
 
 	$nok = 0;
 
-	$enc = $crypt->encrypt($text);
-	$nok++ unless $crypt->decrypt($enc) eq $text;
+	$enc1 = $crypt->encrypt($text);
+	$enc2 = encrypt($key, $cipher, $text, PADDING_AUTO);
+	$nok++ unless ($enc1 eq $enc2);
+
+	$dec1 = $crypt->decrypt($enc1);
+	$dec2 = decrypt($key, $cipher, $enc2, PADDING_AUTO);
+	$nok++ unless ($dec1 eq $text);
+	$nok++ unless ($dec2 eq $text);
 
 	print "not " if $nok;
 	print "ok ".(++$test)."\n";
